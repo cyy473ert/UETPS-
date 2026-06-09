@@ -4,6 +4,7 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Gameplay/Player/CYYCharacterFather.h"
+#include "Kismet/GameplayStatics.h"
 
 AHealPickup::AHealPickup()
 {
@@ -59,6 +60,12 @@ void AHealPickup::OnPickupSphereBeginOverlap(
 
 	bPicked = true;
 	Inventory->AddMedkit(FMath::Max(1, StackAmount));
+
+	if (PickupSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, PickupSound, GetActorLocation());
+	}
+
 	Destroy();
 }
 

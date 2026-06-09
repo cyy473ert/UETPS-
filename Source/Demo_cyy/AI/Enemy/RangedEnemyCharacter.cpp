@@ -5,12 +5,14 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "Components/SphereComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "DataAssets/RangedMonsterData.h"
 #include "GameFramework/DamageType.h"
 #include "Gameplay/Player/CYYCharacterFather.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "TimerManager.h"
 
 ARangedEnemyCharacter::ARangedEnemyCharacter()
 {
@@ -268,6 +270,11 @@ void ARangedEnemyCharacter::FireHitscan()
 			}
 			
 		}
+	}
+
+	if (RangedFireSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, RangedFireSound, GetActorLocation());
 	}
 }
 

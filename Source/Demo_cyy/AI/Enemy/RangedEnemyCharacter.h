@@ -9,6 +9,7 @@ class UBehaviorTree;
 class UAnimMontage;
 class UPrimitiveComponent;
 class UStaticMeshComponent;
+class USoundBase;
 
 UCLASS()
 class DEMO_CYY_API ARangedEnemyCharacter : public AEnemyBase
@@ -86,7 +87,7 @@ private:
 	bool bIsAiming = false;
 	bool bInAttackRange = false;
 	bool bCanHitReact = true;
-	
+
 	bool bIsRetreating = false;
 	bool bBeginPlayInitializing = false;
 	bool bBeginPlayInitialized = false;
@@ -116,4 +117,8 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	float HitReactTimeMax = 3.0f;
+
+	// ── 音效 ──
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sound", meta = (AllowPrivateAccess = "true"))
+	USoundBase* RangedFireSound = nullptr;
 };

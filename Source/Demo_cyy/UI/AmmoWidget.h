@@ -24,6 +24,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="HUD")
 	void SetActiveWeaponSlot(int32 SlotIndex);
 
+	void SetLevelInfo(int32 Level, float CurrentHP, float MaxHP, float DamageMult);
+
 protected:
 	UPROPERTY(meta=(BindWidgetOptional), BlueprintReadOnly)
 	UTextBlock* TB_ClipAmmo = nullptr;
@@ -45,4 +47,13 @@ protected:
 	UBorder* SlotBorder_1 = nullptr;
 	UPROPERTY(meta=(BindWidgetOptional), BlueprintReadOnly)
 	UBorder* SlotBorder_2 = nullptr;
+
+	UPROPERTY(meta=(BindWidgetOptional), BlueprintReadOnly)
+	UTextBlock* TB_Level = nullptr;
+
+	UPROPERTY(meta=(BindWidgetOptional), BlueprintReadOnly)
+	UTextBlock* TB_HPValue = nullptr;
+
+	UPROPERTY(meta=(BindWidgetOptional), BlueprintReadOnly)
+	UTextBlock* TB_DamageMult = nullptr;
 };

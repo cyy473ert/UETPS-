@@ -12,6 +12,7 @@
 #include "Save/CYYSaveGame.h"
 #include "Gameplay/Player/CYYCharacterFather.h"
 #include "Components/LevelProgressionComponent.h"
+#include "Engine/World.h"
 
 ACYYGameModeBase::ACYYGameModeBase()
 {
@@ -61,7 +62,7 @@ void ACYYGameModeBase::Tick(float DeltaSeconds)
 
 	const int32 PrevAlive = AliveEnemyCount;
 	RefreshAliveEnemyCount();
-	if (PrevAlive > 0 && AliveEnemyCount == 0)
+	if (LevelNumber == 2 && PrevAlive > 0 && AliveEnemyCount == 0)
 	{
 		HandleGameOver(true, EGameEndReason::AllEnemiesCleared);
 	}
@@ -132,7 +133,7 @@ void ACYYGameModeBase::OnEnemyDeath(AActor* DeadActor)
 	}
 
 	RefreshAliveEnemyCount();
-	if (PrevAlive > 0 && AliveEnemyCount == 0)
+	if (LevelNumber == 2 && PrevAlive > 0 && AliveEnemyCount == 0)
 	{
 		HandleGameOver(true, EGameEndReason::AllEnemiesCleared);
 	}
@@ -191,6 +192,7 @@ void ACYYGameModeBase::SaveGameProgress()
 	}
 
 	// 3. 标记关卡完成、解锁下一关、更新当前关卡
+	Save->bHasStartedGame = true;
 	Save->MarkLevelCompleted(LevelNumber);
 	Save->CurrentLevel = LevelNumber + 1;  // 继续游戏时跳到下一关
 

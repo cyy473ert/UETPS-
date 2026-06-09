@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "proposal-writer": {
+      "source": "claude-office-skills/skills",
+      "sourceType": "github",
+      "skillPath": "proposal-writer/SKILL.md",
+      "computedHash": "a2cecc481c72c08064b1d8ee77ab1b13751fd989707b0d41748639df65bc88e1"
+    }
+  }
+}

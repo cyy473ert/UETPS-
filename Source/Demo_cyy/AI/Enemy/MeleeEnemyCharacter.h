@@ -8,6 +8,7 @@ class UBoxComponent;
 class UAnimMontage;
 class USphereComponent;
 class AEnemyController;
+class USoundBase;
 UCLASS()
 class DEMO_CYY_API AMeleeEnemyCharacter : public AEnemyBase
 {
@@ -35,7 +36,7 @@ protected:
 	FName GetAttackSectionName();
 	UFUNCTION()
 	void OnRightHandOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
-	
+
 
 	UFUNCTION(BlueprintCallable)
 	void ActivateLeftHand();
@@ -69,7 +70,7 @@ private:
 	bool bCanHitReact = true;
 	FName HitReactionSection = NAME_None;
 	FTimerHandle HitReactTimer;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Combat", meta = (AllowPrivateAccess = "true"))
 	UAnimMontage* HitReactionMnontage = nullptr;
 
@@ -89,6 +90,10 @@ private:
 	bool bInAttackRange = false;
 	FTimerHandle AttackWaitTimer;
 	bool bCanAttack = true;
+
+	// ── 音效 ──
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sound", meta = (AllowPrivateAccess = "true"))
+	USoundBase* MeleeAttackSound = nullptr;
 
 
 public:

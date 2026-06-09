@@ -3,10 +3,13 @@
 #include "AI/Enemy/EnemyController.h"
 #include "Animation/AnimInstance.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Blueprint/UserWidget.h"
 #include "Components/SphereComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Gameplay/Player/CYYCharacterFather.h"
+#include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Subsystems/MinimapTrackingSubsystem.h"
 #include "UI/EnemyHealthWidget.h"
@@ -26,6 +29,22 @@ AEnemyBase::AEnemyBase()
 void AEnemyBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 应用每只怪的实例参数覆盖
+	if (bOverrideHP && HealthComponent)
+	{
+		HealthComponent->SetBaseMaxHealth(OverrideHP);
+		HealthComponent->ResetHealth();
+	}
+	if (bOverrideSpeed)
+	{
+		UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+		if (MoveComp)
+		{
+			MoveComp->MaxWalkSpeed = OverrideSpeed;
+		}
+	}
+
 	EnemyController = Cast<AEnemyController>(GetController());
 	SpawnOrigin = GetActorLocation();
 
@@ -118,6 +137,12 @@ void AEnemyBase::Tick(float DeltaTime)
 void AEnemyBase::HandleDeath()
 {
 	Super::HandleDeath();
+
+	if (DeathSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, DeathSound, GetActorLocation());
+	}
+
 	if (OverheadHealthBar)
 	{
 		OverheadHealthBar->SetVisibility(false);
@@ -134,6 +159,7 @@ void AEnemyBase::HandleDeath()
 }
 float AEnemyBase::GetAttackDamage() const
 {
+	if (bOverrideDamage) return OverrideDamage;
 	return Monster ? Monster->Damage : 15.0f;
 }
 
@@ -141,6 +167,11 @@ float AEnemyBase::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent
 	AController* EventInstigator, AActor* DamageCauser)
 {
 	const float AppliedDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
+	if (AppliedDamage > 0.0f && HurtSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, HurtSound, GetActorLocation());
+	}
 
 	if (!TargetActor && EventInstigator)
 	{
@@ -186,4 +217,3 @@ void AEnemyBase::OnOverheadHealthChanged(UHealthComponent* HC, float NewHealth, 
 		HealthWidget->SetHealthPercent(HC->GetHealthPercent());
 	}
 }
-

@@ -71,6 +71,8 @@ public:
 	void SetMaxHealthMultiplier(float Mult) { MaxHealthMultiplier = Mult; }
 	float GetMaxHealthMultiplier() const { return MaxHealthMultiplier; }
 
+	void SetBaseMaxHealth(float NewBase) { MaxHealth = NewBase; }
+
 private:
 	float MaxHealthMultiplier = 1.0f;
 };

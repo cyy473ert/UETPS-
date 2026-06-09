@@ -20,6 +20,7 @@ class UCanvasPanel;
 class UMinimapWidget;
 class UInventoryComponent;
 class UBackpackWidget;
+class USettingsUserWidget;
 class UToastBannerWidget;
 struct FWeaponSlot;
 
@@ -190,6 +191,8 @@ public:
 
 	void ShowHitNumber(int32 Damage, FVector WorldLocation, bool bHeadShot);
 
+	void UpdateLevelInfo(int32 Level, float CurrentHP, float MaxHP, float DamageMult);
+
 	UFUNCTION(BlueprintPure, Category="UI")
 	EFlowState GetCurrentState() const { return CurrentState; }
 
@@ -200,6 +203,7 @@ private:
 	void EnsureHUDCreated();
 	void EnsureStartMenuCreated();
 	void EnsurePauseMenuCreated();
+	void EnsureSettingsMenuCreated();
 	void EnsureResultMenuCreated();
 	void EnsureAimWidgetsCreated();
 	void EnsureBackpackCreated();
@@ -214,6 +218,7 @@ private:
 	void UnbindInventory();
 	void BindInventory();
 	void CacheHUDChildren();
+	void RefreshMedkitHUD();
 	void RefreshBackpackUI();
 	void BuildWeaponItemEntries(
 		TArray<FBackpackItemEntry>& OutEntries,
@@ -246,10 +251,25 @@ private:
 	void OnInventoryChanged(int32 NewMedkitCount);
 
 	UFUNCTION()
+	void HandleHUDMedkitRequested();
+
+	UFUNCTION()
 	void HandleStartRequested();
 
 	UFUNCTION()
 	void HandleStartContinueRequested();
+
+	UFUNCTION()
+	void HandleStartSettingsRequested();
+
+	UFUNCTION()
+	void HandleSettingsBackRequested();
+
+	UFUNCTION()
+	void HandleSettingsClearSaveRequested();
+
+	UFUNCTION()
+	void HandleSettingsApplied();
 
 	UFUNCTION()
 	void HandlePauseResumeRequested();
@@ -301,6 +321,10 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI", meta=(AllowPrivateAccess="true"))
 	TSubclassOf<UUserWidget> PauseMenuClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI", meta=(AllowPrivateAccess="true"))
+	TSubclassOf<USettingsUserWidget> SettingsMenuClass;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="UI", meta=(AllowPrivateAccess="true"))
 	TSubclassOf<UEndUserWidget> ResultMenuClass;
 
@@ -337,6 +361,10 @@ private:
 
 	UPROPERTY(Transient)
 	UUserWidget* PauseMenuInstance = nullptr;
+
+	UPROPERTY(Transient)
+	USettingsUserWidget* SettingsMenuInstance = nullptr;
+
 	UPROPERTY(Transient)
 	UEndUserWidget* ResultMenuInstance = nullptr;
 

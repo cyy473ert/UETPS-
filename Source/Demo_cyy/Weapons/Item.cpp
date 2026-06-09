@@ -1,6 +1,7 @@
 ﻿#include "Item.h"
 
 #include "Camera/CameraComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/WidgetComponent.h"
 #include "DrawDebugHelpers.h"

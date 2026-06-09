@@ -8,7 +8,10 @@
 #include "Weapon.generated.h"
 
 class UAnimMontage;
+class USkeletalMesh;
+class UStaticMesh;
 class UTexture2D;
+class USoundBase;
 
 UCLASS(BlueprintType)
 class DEMO_CYY_API UWeapon : public UPrimaryDataAsset
@@ -54,4 +57,14 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|UI")
 	UTexture2D* WeaponIcon = nullptr;
+
+	// ── 音效 ──
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Sound")
+	USoundBase* FireSound = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Sound")
+	USoundBase* ReloadSound = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon|Sound")
+	USoundBase* EmptySound = nullptr;
 };

@@ -45,6 +45,12 @@ public:
 	UPROPERTY()
 	FDateTime SaveTimestamp;
 
+	UPROPERTY()
+	bool bHasStartedGame = false;
+
+	UPROPERTY()
+	bool bHasPlayerSnapshot = false;
+
 	// ── 槽位名称常量 ──
 	static const FString SaveSlotName;
 

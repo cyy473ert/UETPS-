@@ -1,6 +1,7 @@
 #include "AI/Enemy/MeleeEnemyCharacter.h"
 #include "Animation/AnimInstance.h"
 #include "Components/BoxComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "DataAssets/MeleeMonsterData.h"
 #include "GameFramework/DamageType.h"
 #include "Gameplay/Player/CYYCharacterFather.h"
@@ -9,6 +10,7 @@
 #include "Components/SphereComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "TimerManager.h"
 AMeleeEnemyCharacter::AMeleeEnemyCharacter()
 	: RAttack(TEXT("RAttack"))
 	, LAttack(TEXT("LAttack"))
@@ -74,7 +76,11 @@ void AMeleeEnemyCharacter::PerformAttack()
 	const float AttackWaitTime = Monster ? FMath::Max(0.1f, Monster->AttackInterval) : 2.0f;
 	GetWorldTimerManager().SetTimer(AttackWaitTimer, this, &AMeleeEnemyCharacter::ResetMeleeCanAttack, AttackWaitTime, false);
 	PlayAttackMnontage(GetAttackSectionName(), 1.0f);
-	
+
+	if (MeleeAttackSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, MeleeAttackSound, GetActorLocation());
+	}
 }
 void AMeleeEnemyCharacter::PlayAttackMnontage(FName MontageSection, float PlayRate)
 {

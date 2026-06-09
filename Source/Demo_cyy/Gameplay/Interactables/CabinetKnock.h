@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "CabinetKnock.generated.h"
 
+class USceneComponent;
 class UStaticMeshComponent;
 class USphereComponent;
 class USoundBase;
@@ -19,28 +20,28 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> RootComp;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UStaticMeshComponent> CabinetMesh;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USphereComponent> TriggerSphere;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USoundBase> KnockSound1;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USoundBase> KnockSound2;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USoundBase> KnockSound3;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USoundBase> VoiceLine;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USoundBase> LoudKnockSound;
 
 	bool bTriggered = false;

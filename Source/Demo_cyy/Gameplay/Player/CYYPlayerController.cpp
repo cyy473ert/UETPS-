@@ -6,6 +6,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/Character.h"
+#include "Engine/LocalPlayer.h"
 
 ACYYPlayerController::ACYYPlayerController()
 	: BaseTurnRate(45.0f)

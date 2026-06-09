@@ -10,6 +10,7 @@ class USkeletalMeshComponent;
 class USphereComponent;
 class UWidgetComponent;
 class UParticleSystem;
+class USoundBase;
 class ACYYCharacterFather;
 
 UCLASS()
@@ -49,6 +50,12 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = Weapon)
 	TSubclassOf<UWeapon> WeaponDataAssetClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+	USoundBase* PickupSound = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound")
+	USoundBase* EquipSound = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = SocketName, meta = (AllowPrivateAccess = "true"))
 	FName EquitmentSocketName = TEXT("Weapon");

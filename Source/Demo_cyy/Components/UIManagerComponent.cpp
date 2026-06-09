@@ -24,8 +24,10 @@
 #include "UI/HealthWidget.h"
 #include "UI/MinimapWidget.h"
 #include "UI/Set_UserWidget.h"
+#include "UI/SettingsUserWidget.h"
 #include "UI/ToastBannerWidget.h"
 #include "Misc/DateTime.h"
+#include "Misc/PackageName.h"
 #include "UObject/UObjectGlobals.h"
 #include "Save/CYYSaveManager.h"
 #include "Save/CYYSaveGame.h"
@@ -33,8 +35,8 @@
 UUIManagerComponent::UUIManagerComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-	StartGameLevelName = TEXT("Level1_Shelter");
-	MainMenuLevelName = TEXT("UMGStartMap");
+	StartGameLevelName = TEXT("/Game/11/Level1_Shelter");
+	MainMenuLevelName = TEXT("/Game/CYY/Maps/UMGStartMap");
 
 	static ConstructorHelpers::FClassFinder<UUserWidget> StartMenuClassFinder(TEXT("/Game/CYY/UI/W_Begin"));
 	if (StartMenuClassFinder.Succeeded())
@@ -46,6 +48,12 @@ UUIManagerComponent::UUIManagerComponent()
 	if (PauseMenuClassFinder.Succeeded())
 	{
 		PauseMenuClass = PauseMenuClassFinder.Class;
+	}
+
+	static ConstructorHelpers::FClassFinder<USettingsUserWidget> SettingsMenuClassFinder(TEXT("/Game/CYY/UI/W_Settings"));
+	if (SettingsMenuClassFinder.Succeeded())
+	{
+		SettingsMenuClass = SettingsMenuClassFinder.Class;
 	}
 
 	static ConstructorHelpers::FClassFinder<UEndUserWidget> ResultMenuClassFinder(TEXT("/Game/CYY/UI/W_End"));
@@ -109,6 +117,7 @@ void UUIManagerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	HideWidget(BackpackHintInstance);
 	HideWidget(ToastBannerInstance);
 	HideWidget(PauseMenuInstance);
+	HideWidget(SettingsMenuInstance);
 	HideWidget(ResultMenuInstance);
 	HideWidget(StartMenuInstance);
 	if (!HUDRootInstance)
@@ -142,7 +151,7 @@ void UUIManagerComponent::InitializeForController(APlayerController* InPlayerCon
 	const FString CurrentLevelName = UGameplayStatics::GetCurrentLevelName(this, true);
 	if (ResolvedInitialState == EFlowState::InGame
 		&& !MainMenuLevelName.IsNone()
-		&& CurrentLevelName.Equals(MainMenuLevelName.ToString(), ESearchCase::IgnoreCase))
+		&& CurrentLevelName.Equals(FPackageName::GetShortName(MainMenuLevelName.ToString()), ESearchCase::IgnoreCase))
 	{
 		ResolvedInitialState = EFlowState::MainMenu;
 	}
@@ -326,7 +335,7 @@ bool UUIManagerComponent::RequestFlowAction(EFlowAction Action, const FFlowActio
 		if (!StartGameLevelName.IsNone())
 		{
 			const FString CurrentLevelName = UGameplayStatics::GetCurrentLevelName(this, true);
-			if (!CurrentLevelName.Equals(StartGameLevelName.ToString(), ESearchCase::IgnoreCase))
+			if (!CurrentLevelName.Equals(FPackageName::GetShortName(StartGameLevelName.ToString()), ESearchCase::IgnoreCase))
 			{
 				OpenLevelWithActionLock(StartGameLevelName);
 			}
@@ -335,10 +344,6 @@ bool UUIManagerComponent::RequestFlowAction(EFlowAction Action, const FFlowActio
 
 	case EFlowAction::Retry:
 	{
-		if (ACYYCharacterFather* PlayerChar = Cast<ACYYCharacterFather>(CombatCharacter))
-		{
-			PlayerChar->ClearMedkitInventory();
-		}
 		if (!TransitionToState(EFlowState::Transition, Source))
 		{
 			return false;
@@ -353,12 +358,9 @@ bool UUIManagerComponent::RequestFlowAction(EFlowAction Action, const FFlowActio
 	}
 
 	case EFlowAction::ReturnMenu:
-		if (ACYYCharacterFather* PlayerChar = Cast<ACYYCharacterFather>(CombatCharacter))
-		{
-			PlayerChar->ClearMedkitInventory();
-		}
 		if (CurrentState == EFlowState::Paused)
 		{
+			SaveCurrentGame();
 			if (!TransitionToState(EFlowState::MainMenu, Source))
 			{
 				return false;
@@ -434,6 +436,19 @@ void UUIManagerComponent::SetAmmo(int32 InClipAmmo, int32 InTotalAmmo, float InR
 	if (AmmoWidget)
 	{
 		AmmoWidget->SetAmmo(InClipAmmo, InTotalAmmo, InReloadAlpha);
+	}
+}
+
+void UUIManagerComponent::UpdateLevelInfo(int32 Level, float CurrentHP, float MaxHP, float DamageMult)
+{
+	if (!AmmoWidget)
+	{
+		EnsureHUDCreated();
+	}
+
+	if (AmmoWidget)
+	{
+		AmmoWidget->SetLevelInfo(Level, CurrentHP, MaxHP, DamageMult);
 	}
 }
 
@@ -625,8 +640,25 @@ void UUIManagerComponent::EnsureStartMenuCreated()
 	{
 		BeginMenu->OnStartClicked.AddUniqueDynamic(this, &UUIManagerComponent::HandleStartRequested);
 		BeginMenu->OnContinueClicked.AddUniqueDynamic(this, &UUIManagerComponent::HandleStartContinueRequested);
+		BeginMenu->OnSetClicked.AddUniqueDynamic(this, &UUIManagerComponent::HandleStartSettingsRequested);
 		BeginMenu->OnEndClicked.AddUniqueDynamic(this, &UUIManagerComponent::HandlePauseQuitRequested);
 		BeginMenu->SetContinueButtonVisible(HasSaveFile());
+	}
+}
+
+void UUIManagerComponent::EnsureSettingsMenuCreated()
+{
+	if (SettingsMenuInstance || !SettingsMenuClass || !LocalPlayerController)
+	{
+		return;
+	}
+
+	SettingsMenuInstance = CreateWidget<USettingsUserWidget>(LocalPlayerController, SettingsMenuClass);
+	if (SettingsMenuInstance)
+	{
+		SettingsMenuInstance->OnBackClicked.AddUniqueDynamic(this, &UUIManagerComponent::HandleSettingsBackRequested);
+		SettingsMenuInstance->OnClearSaveClicked.AddUniqueDynamic(this, &UUIManagerComponent::HandleSettingsClearSaveRequested);
+		SettingsMenuInstance->OnApplyClicked.AddUniqueDynamic(this, &UUIManagerComponent::HandleSettingsApplied);
 	}
 }
 
@@ -745,6 +777,7 @@ void UUIManagerComponent::ApplyState(EFlowState NewState)
 		}
 		HideWidget(StartMenuInstance);
 		HideWidget(PauseMenuInstance);
+		HideWidget(SettingsMenuInstance);
 		HideWidget(ResultMenuInstance);
 		EnsureBackpackHintCreated();
 		if (bBackpackVisible)
@@ -770,6 +803,7 @@ void UUIManagerComponent::ApplyState(EFlowState NewState)
 			ShowWidget(AmmoWidget, 0);
 		}
 		HideWidget(StartMenuInstance);
+		HideWidget(SettingsMenuInstance);
 		HideWidget(ResultMenuInstance);
 		ShowWidget(PauseMenuInstance, 100);
 		HideWidget(BackpackHintInstance);
@@ -796,6 +830,7 @@ void UUIManagerComponent::ApplyState(EFlowState NewState)
 		ClearEnemyTarget();
 		HideWidget(BackpackHintInstance);
 		HideWidget(PauseMenuInstance);
+		HideWidget(SettingsMenuInstance);
 		HideWidget(ResultMenuInstance);
 		HideWidget(BackpackWidgetInstance);
 		ShowWidget(StartMenuInstance, 100);
@@ -825,6 +860,7 @@ void UUIManagerComponent::ApplyState(EFlowState NewState)
 		}
 		HideWidget(PauseMenuInstance);
 		HideWidget(StartMenuInstance);
+		HideWidget(SettingsMenuInstance);
 		ShowWidget(HUDRootInstance, 0);
 		HideWidget(MinimapWidget);
 		if (!HUDRootInstance)
@@ -842,7 +878,8 @@ void UUIManagerComponent::ApplyState(EFlowState NewState)
 			if (UButton* NextLevelBtn = Cast<UButton>(ResultMenuInstance->GetWidgetFromName(TEXT("NextLevelBtn"))))
 			{
 				const bool bShowNext = bHasLastResultData
-					&& LastResultData.ResultType == EGameResultType::Win;
+					&& LastResultData.ResultType == EGameResultType::Win
+					&& LevelNumberToMapName(GetContinueLevelNumber()) != NAME_None;
 				NextLevelBtn->SetVisibility(
 					bShowNext ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 			}
@@ -855,6 +892,7 @@ void UUIManagerComponent::ApplyState(EFlowState NewState)
 		HideWidget(PauseMenuInstance);
 		HideWidget(ResultMenuInstance);
 		HideWidget(StartMenuInstance);
+		HideWidget(SettingsMenuInstance);
 		HideWidget(BackpackHintInstance);
 		HideWidget(BackpackWidgetInstance);
 		break;
@@ -864,6 +902,7 @@ void UUIManagerComponent::ApplyState(EFlowState NewState)
 	}
 
 	UpdateAimWidgetsVisibility();
+	RefreshMedkitHUD();
 }
 
 void UUIManagerComponent::ApplyInputModeForState(EFlowState NewState)
@@ -973,10 +1012,15 @@ void UUIManagerComponent::CacheHUDChildren()
 	HealthWidget = HUDRootInstance ? HUDRootInstance->GetHealthWidget() : nullptr;
 	AmmoWidget = HUDRootInstance ? HUDRootInstance->GetAmmoWidget() : nullptr;
 	EnemyHealthWidget = HUDRootInstance ? HUDRootInstance->GetEnemyHealthWidget() : nullptr;
+	if (HUDRootInstance)
+	{
+		HUDRootInstance->OnMedkitClicked.AddUniqueDynamic(this, &UUIManagerComponent::HandleHUDMedkitRequested);
+	}
 	if (EnemyHealthWidget)
 	{
 		EnemyHealthWidget->SetVisibility(ESlateVisibility::Collapsed);
 	}
+	RefreshMedkitHUD();
 }
 
 void UUIManagerComponent::UnbindHealth()
@@ -1007,21 +1051,27 @@ void UUIManagerComponent::BindInventory()
 	BoundInventoryComponent = PlayerChar ? PlayerChar->GetInventoryComponent() : nullptr;
 	if (!BoundInventoryComponent)
 	{
+		RefreshMedkitHUD();
 		return;
 	}
 
 	BoundInventoryComponent->OnInventoryChanged.AddUniqueDynamic(this, &UUIManagerComponent::OnInventoryChanged);
+	RefreshMedkitHUD();
 	RefreshBackpackUI();
 }
 
 void UUIManagerComponent::OnHealthChanged(UHealthComponent* InHealthComponent, float NewHealth, float Delta, AActor* InstigatorActor)
 {
-	if (!InHealthComponent || !HealthWidget)
+	if (!InHealthComponent)
 	{
 		return;
 	}
 
-	HealthWidget->SetHealthPercent(InHealthComponent->GetHealthPercent());
+	if (HealthWidget)
+	{
+		HealthWidget->SetHealthPercent(InHealthComponent->GetHealthPercent());
+	}
+	RefreshMedkitHUD();
 	RefreshBackpackUI();
 }
 
@@ -1029,6 +1079,7 @@ void UUIManagerComponent::OnCharacterDeath(AActor* DeadActor)
 {
 	SetAiming(false);
 	ClearEnemyTarget();
+	RefreshMedkitHUD();
 }
 
 void UUIManagerComponent::OnEnemyHealthChanged(UHealthComponent* InHealthComponent, float NewHealth, float Delta, AActor* InstigatorActor)
@@ -1091,6 +1142,65 @@ void UUIManagerComponent::HandleStartContinueRequested()
 	ContinueGame();
 }
 
+void UUIManagerComponent::HandleStartSettingsRequested()
+{
+	EnsureSettingsMenuCreated();
+	if (!SettingsMenuInstance || !LocalPlayerController)
+	{
+		return;
+	}
+
+	HideWidget(StartMenuInstance);
+	SettingsMenuInstance->RefreshControlsFromSavedSettings();
+	ShowWidget(SettingsMenuInstance, 150);
+	LocalPlayerController->SetShowMouseCursor(true);
+	UWidgetBlueprintLibrary::SetInputMode_UIOnlyEx(LocalPlayerController, SettingsMenuInstance, EMouseLockMode::DoNotLock);
+}
+
+void UUIManagerComponent::HandleSettingsBackRequested()
+{
+	HideWidget(SettingsMenuInstance);
+	if (CurrentState == EFlowState::MainMenu && LocalPlayerController)
+	{
+		ShowWidget(StartMenuInstance, 100);
+		if (StartMenuInstance)
+		{
+			if (UButton* ContinueBtn = Cast<UButton>(StartMenuInstance->GetWidgetFromName(TEXT("ContinueBtn"))))
+			{
+				ContinueBtn->SetVisibility(HasSaveFile() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+			}
+		}
+		UWidgetBlueprintLibrary::SetInputMode_UIOnlyEx(LocalPlayerController, StartMenuInstance, EMouseLockMode::DoNotLock);
+	}
+	else
+	{
+		ApplyInputModeForState(CurrentState);
+	}
+}
+
+void UUIManagerComponent::HandleSettingsClearSaveRequested()
+{
+	UE_LOG(LogTemp, Warning, TEXT("[UIManager] Clear save requested from settings menu."));
+
+	FCYYSaveManager::DeleteSave();
+	CachedSaveData = nullptr;
+
+	if (StartMenuInstance)
+	{
+		if (UButton* ContinueBtn = Cast<UButton>(StartMenuInstance->GetWidgetFromName(TEXT("ContinueBtn"))))
+		{
+			ContinueBtn->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
+
+	ShowPickupBanner(TEXT("存档已清除"));
+}
+
+void UUIManagerComponent::HandleSettingsApplied()
+{
+	ShowPickupBanner(TEXT("设置已应用"));
+}
+
 void UUIManagerComponent::HandlePauseSaveRequested()
 {
 	SaveCurrentGame();
@@ -1103,6 +1213,54 @@ void UUIManagerComponent::HandleResultNextLevelRequested()
 
 void UUIManagerComponent::OnInventoryChanged(int32 NewMedkitCount)
 {
+	RefreshMedkitHUD();
+	RefreshBackpackUI();
+}
+
+void UUIManagerComponent::RefreshMedkitHUD()
+{
+	if (!HUDRootInstance)
+	{
+		return;
+	}
+
+	const ACYYCharacterFather* PlayerChar = Cast<ACYYCharacterFather>(CombatCharacter);
+	const UInventoryComponent* Inventory = PlayerChar ? PlayerChar->GetInventoryComponent() : nullptr;
+	const UHealthComponent* Health = PlayerChar ? PlayerChar->GetHealthComponent() : nullptr;
+
+	const int32 MedkitCount = Inventory ? Inventory->GetMedkitCount() : 0;
+	const bool bFullHealth = Health ? (Health->GetCurrentHealth() >= Health->GetMaxHealth() - KINDA_SMALL_NUMBER) : true;
+	const bool bFlowBlocked = (CurrentState == EFlowState::Result || CurrentState == EFlowState::Transition);
+	const bool bCanUse = (MedkitCount > 0) && !bFullHealth && !bFlowBlocked;
+
+	FText DisabledReason = FText::GetEmpty();
+	if (MedkitCount <= 0)
+	{
+		DisabledReason = FText::FromString(TEXT("没有医疗包"));
+	}
+	else if (bFullHealth)
+	{
+		DisabledReason = FText::FromString(TEXT("生命值已满"));
+	}
+	else if (bFlowBlocked)
+	{
+		DisabledReason = FText::FromString(TEXT("当前状态不可用"));
+	}
+
+	HUDRootInstance->SetMedkitState(MedkitCount, bCanUse, DisabledReason);
+}
+
+void UUIManagerComponent::HandleHUDMedkitRequested()
+{
+	ACYYCharacterFather* PlayerChar = Cast<ACYYCharacterFather>(CombatCharacter);
+	if (!PlayerChar)
+	{
+		return;
+	}
+
+	const EMedkitUseResult Result = PlayerChar->TryUseMedkit();
+	ShowMedkitUseFeedback(Result);
+	RefreshMedkitHUD();
 	RefreshBackpackUI();
 }
 
@@ -1312,9 +1470,25 @@ void UUIManagerComponent::RefreshBackpackUI()
 	MedkitEntry.Icon = MedkitIcon;
 	MedkitEntry.DisplayName = FText::FromString(TEXT("医疗包"));
 	MedkitEntry.Description = FText::FromString(
-		FString::Printf(TEXT("恢复50生命值 | 当前生命: %.0f / %.0f"), CurrentHP, MaxHP));
+		FString::Printf(TEXT("恢复%.0f生命值 | 当前生命: %.0f / %.0f"), ACYYCharacterFather::MedkitHealAmount, CurrentHP, MaxHP));
 	MedkitEntry.StackCount = MedkitCount;
 	MedkitEntry.bCanUse = (MedkitCount > 0) && !bFullHealth && !bFlowBlocked;
+	MedkitEntry.UseButtonText = FText::FromString(TEXT("使用"));
+	if (MedkitCount <= 0)
+	{
+		MedkitEntry.DisabledReason = FText::FromString(TEXT("没有医疗包"));
+	}
+	else if (bFullHealth)
+	{
+		MedkitEntry.DisabledReason = FText::FromString(TEXT("生命值已满"));
+	}
+	else if (bFlowBlocked)
+	{
+		MedkitEntry.DisabledReason = FText::FromString(TEXT("当前状态不可用"));
+	}
+	MedkitEntry.DisplayName = FText::FromString(TEXT("医疗包"));
+	MedkitEntry.Description = FText::FromString(
+		FString::Printf(TEXT("恢复%.0f生命值 | 当前生命: %.0f / %.0f"), ACYYCharacterFather::MedkitHealAmount, CurrentHP, MaxHP));
 	MedkitEntry.UseButtonText = FText::FromString(TEXT("使用"));
 	if (MedkitCount <= 0)
 	{
@@ -1518,7 +1692,7 @@ void UUIManagerComponent::HandleMapLoaded(UWorld* LoadedWorld)
 {
 	bActionLocked = false;
 	const FString CurrentLevelName = UGameplayStatics::GetCurrentLevelName(this, true);
-	const bool bMainMenuLevel = CurrentLevelName.Equals(MainMenuLevelName.ToString(), ESearchCase::IgnoreCase);
+	const bool bMainMenuLevel = CurrentLevelName.Equals(FPackageName::GetShortName(MainMenuLevelName.ToString()), ESearchCase::IgnoreCase);
 	const EFlowState PostLoadTarget = bMainMenuLevel ? EFlowState::MainMenu : EFlowState::InGame;
 	if (CurrentState == EFlowState::Transition)
 	{
@@ -1584,23 +1758,25 @@ bool UUIManagerComponent::HasSaveFile() const
 
 void UUIManagerComponent::ContinueGame()
 {
-	// 读档 → 获取 CurrentLevel → 加载对应地图
-	UCYYSaveGame* Save = FCYYSaveManager::LoadOrCreate();
-	if (!Save) return;
+	UCYYSaveGame* Save = FCYYSaveManager::LoadExisting();
+	if (!Save || !Save->bHasStartedGame)
+	{
+		return;
+	}
 
 	int32 ContinueLevel = Save->CurrentLevel;
-	// 兜底：如果所有关卡都通关了，回到第1关
 	if (ContinueLevel > 2)
 	{
 		ContinueLevel = 1;
 	}
+	CachedSaveData = Save;
 	LoadAndStartLevel(ContinueLevel);
 }
 
 void UUIManagerComponent::StartNewGame()
 {
-	// 删除旧存档 → 创建新档 → 从第1关开始
 	FCYYSaveManager::DeleteSave();
+	CachedSaveData = FCYYSaveManager::CreateNew();
 	LoadAndStartLevel(1);
 }
 
@@ -1614,9 +1790,17 @@ void UUIManagerComponent::LoadAndStartLevel(int32 LevelNumber)
 	}
 
 	// 缓存存档数据
-	CachedSaveData = FCYYSaveManager::LoadOrCreate();
+	if (!CachedSaveData)
+	{
+		CachedSaveData = FCYYSaveManager::LoadExisting();
+	}
+	if (!CachedSaveData)
+	{
+		CachedSaveData = FCYYSaveManager::CreateNew();
+	}
 	if (CachedSaveData)
 	{
+		CachedSaveData->bHasStartedGame = true;
 		CachedSaveData->CurrentLevel = LevelNumber;
 		FCYYSaveManager::SaveGame(CachedSaveData);
 	}
@@ -1630,10 +1814,7 @@ void UUIManagerComponent::LoadAndStartLevel(int32 LevelNumber)
 
 int32 UUIManagerComponent::GetContinueLevelNumber() const
 {
-	if (!CachedSaveData)
-	{
-		CachedSaveData = FCYYSaveManager::LoadOrCreate();
-	}
+	CachedSaveData = FCYYSaveManager::LoadExisting();
 	return CachedSaveData ? CachedSaveData->CurrentLevel : 1;
 }
 
@@ -1641,7 +1822,7 @@ bool UUIManagerComponent::IsLevelUnlocked(int32 LevelNumber) const
 {
 	if (!CachedSaveData)
 	{
-		CachedSaveData = FCYYSaveManager::LoadOrCreate();
+		CachedSaveData = FCYYSaveManager::LoadExisting();
 	}
 	return CachedSaveData ? CachedSaveData->IsLevelUnlocked(LevelNumber) : (LevelNumber == 1);
 }
@@ -1650,7 +1831,7 @@ bool UUIManagerComponent::IsLevelCompleted(int32 LevelNumber) const
 {
 	if (!CachedSaveData)
 	{
-		CachedSaveData = FCYYSaveManager::LoadOrCreate();
+		CachedSaveData = FCYYSaveManager::LoadExisting();
 	}
 	return CachedSaveData ? CachedSaveData->IsLevelCompleted(LevelNumber) : false;
 }
@@ -1658,7 +1839,7 @@ bool UUIManagerComponent::IsLevelCompleted(int32 LevelNumber) const
 int32 UUIManagerComponent::GetMaxUnlockedLevel() const
 {
 	// 每次都重新加载，防止 GameMode::SaveGameProgress 存档后缓存未更新
-	CachedSaveData = FCYYSaveManager::LoadOrCreate();
+	CachedSaveData = FCYYSaveManager::LoadExisting();
 	return CachedSaveData ? CachedSaveData->MaxUnlockedLevel : 1;
 }
 
@@ -1667,8 +1848,8 @@ FName UUIManagerComponent::LevelNumberToMapName(int32 LevelNumber) const
 	// ── 关卡编号 → 地图名称映射 ──
 	switch (LevelNumber)
 	{
-	case 1: return TEXT("Level1_Shelter");
-	case 2: return TEXT("Level2_Factory");
+	case 1: return TEXT("/Game/11/Level1_Shelter");
+	case 2: return TEXT("/Game/11/Level2_Factory");
 	default: return NAME_None;
 	}
 }
@@ -1677,6 +1858,7 @@ void UUIManagerComponent::SaveCurrentGame()
 {
 	UCYYSaveGame* Save = FCYYSaveManager::LoadOrCreate();
 	if (!Save) return;
+	Save->bHasStartedGame = true;
 
 	ACYYCharacterFather* PlayerChar = Cast<ACYYCharacterFather>(CombatCharacter);
 	if (PlayerChar)
@@ -1689,13 +1871,22 @@ void UUIManagerComponent::SaveCurrentGame()
 
 void UUIManagerComponent::PlayNextLevel()
 {
-	UCYYSaveGame* Save = FCYYSaveManager::LoadOrCreate();
-	if (!Save) return;
+	UCYYSaveGame* Save = FCYYSaveManager::LoadExisting();
+	if (!Save || !Save->bHasStartedGame)
+	{
+		ShowPickupBanner(TEXT("没有可用存档"));
+		return;
+	}
 
 	const FName MapName = LevelNumberToMapName(Save->CurrentLevel);
-	if (MapName.IsNone()) return;
+	if (MapName.IsNone())
+	{
+		ShowPickupBanner(TEXT("没有可进入的下一关"));
+		return;
+	}
 
 	CachedSaveData = Save;
 	StartGameLevelName = MapName;
+	TransitionToState(EFlowState::Transition, TEXT("ResultMenu.NextLevel"));
 	OpenLevelWithActionLock(MapName);
 }

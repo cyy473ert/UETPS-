@@ -1,6 +1,7 @@
 #include "LevelEndTrigger.h"
 
 #include "Components/BoxComponent.h"
+#include "Engine/World.h"
 #include "Gameplay/Player/CYYCharacterFather.h"
 #include "Gameplay/GameModes/CYYGameModeBase.h"
 #include "Kismet/GameplayStatics.h"

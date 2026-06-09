@@ -6,6 +6,7 @@
 
 class USphereComponent;
 class UStaticMeshComponent;
+class USoundBase;
 
 UCLASS()
 class DEMO_CYY_API AHealPickup : public AActor
@@ -36,6 +37,9 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Pickup", meta=(AllowPrivateAccess="true", ClampMin="1"))
 	int32 StackAmount = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pickup|Sound", meta = (AllowPrivateAccess = "true"))
+	USoundBase* PickupSound = nullptr;
 
 	UPROPERTY(Transient)
 	bool bPicked = false;

@@ -13,10 +13,14 @@
 #include "AI/Enemy/EnemyBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/DamageType.h"
+#include "Engine/World.h"
 #include "Interaction/Interact.h"
 #include "Item.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundCue.h"
+#include "Save/CYYSaveManager.h"
+#include "Save/CYYSaveGame.h"
+#include "TimerManager.h"
 
 namespace
 {
@@ -89,10 +93,41 @@ void ACYYCharacterFather::BeginPlay()
 
 	if (LevelComponent)
 	{
-		LevelComponent->OnLevelUpClient.AddDynamic(this, &ACYYCharacterFather::OnLeveledUp);
+		LevelComponent->OnLevelUp.AddDynamic(this, &ACYYCharacterFather::OnLeveledUp);
 	}
 
 	UpdateAmmoUI(0.0f);
+
+	// 只有真正保存过玩家快照时才恢复，避免新游戏的空存档清掉默认装备。
+	{
+		UCYYSaveGame* Save = FCYYSaveManager::LoadExisting();
+		if (Save && Save->bHasStartedGame && Save->bHasPlayerSnapshot)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[RESTORE] BeginPlay 检测到 Level%d，开始恢复"), Save->CurrentLevel);
+			FCYYSaveManager::ApplyToPlayer(Save, this);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[RESTORE] 跳过恢复 CurrentLevel=%d"), Save ? Save->CurrentLevel : -1);
+		}
+	}
+
+	// 初始化 HUD 等级信息显示
+	if (ACYYPlayerController* PC = Cast<ACYYPlayerController>(GetController()))
+	{
+		if (UUIManagerComponent* UIMgr = PC->GetUIManagerComponent())
+		{
+			if (UHealthComponent* HC = GetHealthComponent())
+			{
+				UIMgr->UpdateLevelInfo(
+					LevelComponent ? LevelComponent->CurrentLevel : 1,
+					HC->GetCurrentHealth(),
+					HC->GetMaxHealth(),
+					LevelComponent ? LevelComponent->GetDamageMultiplier() : 1.0f
+				);
+			}
+		}
+	}
 }
 
 void ACYYCharacterFather::Tick(float DeltaTime)
@@ -153,12 +188,32 @@ void ACYYCharacterFather::HandleSelfHealthChanged(UHealthComponent* InHealthComp
 
 	if (Delta < 0.0f)
 	{
+		if (HurtSound)
+		{
+			UGameplayStatics::PlaySound2D(this, HurtSound);
+		}
+
 		if (ACYYPlayerController* PC = Cast<ACYYPlayerController>(GetController()))
 		{
 			if (UUIManagerComponent* UIManager = PC->GetUIManagerComponent())
 			{
 				UIManager->AutoCloseBackpack();
 			}
+		}
+	}
+
+	// 实时刷新 HUD 的 HP 数字
+	if (ACYYPlayerController* PC = Cast<ACYYPlayerController>(GetController()))
+	{
+		if (UUIManagerComponent* UIMgr = PC->GetUIManagerComponent())
+		{
+			const float MaxHP = InHealthComponent ? InHealthComponent->GetMaxHealth() : 100.0f;
+			UIMgr->UpdateLevelInfo(
+				LevelComponent ? LevelComponent->CurrentLevel : 1,
+				NewHealth,
+				MaxHP,
+				LevelComponent ? LevelComponent->GetDamageMultiplier() : 1.0f
+			);
 		}
 	}
 }
@@ -184,6 +239,11 @@ void ACYYCharacterFather::HandleSelfDeath(AActor* DeadActor)
 			UIManager->ClearEnemyTarget();
 			UIManager->SetAmmo(CurrentClipAmmo, CurrentTotalAmmo, 0.0f);
 		}
+	}
+
+	if (DeathSound)
+	{
+		UGameplayStatics::PlaySound2D(this, DeathSound);
 	}
 }
 
@@ -219,14 +279,15 @@ void ACYYCharacterFather::TriggerFireByAnimNotify()
 
 	const FVector ShotDirection = FollowCamera ? FollowCamera->GetForwardVector() : GetActorForwardVector();
 	const bool bHeadShot = FocusedEnemyHitResult.BoneName.ToString().Contains(TEXT("head"), ESearchCase::IgnoreCase);
-	int32 FinalDamage = FMath::RoundToInt(CurrentWeaponData->Damage);
+	const float DamageMult = LevelComponent ? LevelComponent->GetDamageMultiplier() : 1.0f;
+	int32 FinalDamage = FMath::RoundToInt(CurrentWeaponData->Damage * DamageMult);
 	if (bHeadShot)
 	{
 		FinalDamage *= 2;
 	}
 	UGameplayStatics::ApplyPointDamage(
 		FocusedEnemyTarget,
-		CurrentWeaponData->Damage,
+		FinalDamage,
 		ShotDirection,
 		FocusedEnemyHitResult,
 		GetController(),
@@ -260,6 +321,10 @@ void ACYYCharacterFather::GunShot()
 	}
 	if (CurrentClipAmmo <= 0)
 	{
+		if (CurrentWeaponData && CurrentWeaponData->EmptySound)
+		{
+			UGameplayStatics::PlaySound2D(this, CurrentWeaponData->EmptySound);
+		}
 		return;
 	}
 	UAnimInstance* AnimIns = Arm->GetAnimInstance();
@@ -284,12 +349,14 @@ void ACYYCharacterFather::GunShot()
 	bIsFiring = true;
 
 	// 开火音效做最小间隔节流，避免快速射击时音频叠播引起卡顿。
-	if (FireSound && GetWorld())
+	USoundBase* ShotSound = (CurrentWeaponData && CurrentWeaponData->FireSound)
+		? CurrentWeaponData->FireSound : FireSound;
+	if (ShotSound && GetWorld())
 	{
 		const float Now = GetWorld()->GetTimeSeconds();
 		if (Now - LastFireSoundTime >= FireSoundMinInterval)
 		{
-			UGameplayStatics::PlaySound2D(this, FireSound);
+			UGameplayStatics::PlaySound2D(this, ShotSound);
 			LastFireSoundTime = Now;
 		}
 	}
@@ -315,6 +382,11 @@ void ACYYCharacterFather::Reload()
 
 	bIsReloading = true;
 	UpdateAmmoUI(0.01f);
+
+	if (CurrentWeaponData && CurrentWeaponData->ReloadSound)
+	{
+		UGameplayStatics::PlaySound2D(this, CurrentWeaponData->ReloadSound);
+	}
 
 	if (CurrentWeaponData->ReloadMontage && Arm)
 	{
@@ -490,6 +562,16 @@ void ACYYCharacterFather::PickUp()
 	if (!NewWeaponData)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("PickUp: WeaponData is null. Actor=%s"), *GetNameSafe(TargetWeapon));
+	}
+
+	// 拾取音效
+	if (TargetWeapon && TargetWeapon->PickupSound)
+	{
+		UGameplayStatics::PlaySound2D(this, TargetWeapon->PickupSound);
+	}
+	if (TargetWeapon && TargetWeapon->EquipSound)
+	{
+		UGameplayStatics::PlaySound2D(this, TargetWeapon->EquipSound);
 	}
 
 	IInteract::Execute_HideInteractWidget(FocusedInteractActor);
@@ -726,7 +808,11 @@ EMedkitUseResult ACYYCharacterFather::TryUseMedkit()
 	const EMedkitUseResult Result = InventoryComponent->TryUseMedkit(FlowState, bIsFullHealth);
 	if (Result == EMedkitUseResult::Success)
 	{
-		Health->Heal(50.0f, this);
+		if (MedkitUseSound)
+		{
+			UGameplayStatics::PlaySound2D(this, MedkitUseSound);
+		}
+		Health->Heal(MedkitHealAmount, this);
 	}
 	return Result;
 }
@@ -783,6 +869,12 @@ void ACYYCharacterFather::SwitchWeapon(int32 SlotIndex)
 	CurrentClipAmmo = NewSlot.ClipAmmo;
 	CurrentTotalAmmo = NewSlot.TotalAmmo;
 	UpdateAmmoUI(0.0f);
+
+	// 装备音效
+	if (EquippedWeapon && EquippedWeapon->EquipSound)
+	{
+		UGameplayStatics::PlaySound2D(this, EquippedWeapon->EquipSound);
+	}
 }
 
 void ACYYCharacterFather::OnLeveledUp(int32 NewLevel, int32 OldLevel)
@@ -793,13 +885,29 @@ void ACYYCharacterFather::OnLeveledUp(int32 NewLevel, int32 OldLevel)
 		HC->SetMaxHealthMultiplier(LevelComponent ? LevelComponent->GetHPMultiplier() : 1.0f);
 	}
 
-	// Toast
+	// 通知客户端弹 Toast + 刷新 HUD
+	ClientShowLevelUp(NewLevel, OldLevel);
+}
+
+void ACYYCharacterFather::ClientShowLevelUp_Implementation(int32 NewLevel, int32 OldLevel)
+{
 	if (ACYYPlayerController* PC = Cast<ACYYPlayerController>(GetController()))
 	{
 		if (UUIManagerComponent* UIMgr = PC->GetUIManagerComponent())
 		{
 			UIMgr->ShowPickupBanner(
-				FString::Printf(TEXT("LEVEL UP! Lv%d → Lv%d"), OldLevel, NewLevel));
+				FString::Printf(TEXT("等级升级! 等级%d → 等级%d"), OldLevel, NewLevel));
+
+		// 刷新 HUD 等级/HP/伤害
+		if (UHealthComponent* HC = GetHealthComponent())
+		{
+			UIMgr->UpdateLevelInfo(
+				NewLevel,
+				HC->GetCurrentHealth(),
+				HC->GetMaxHealth(),
+				LevelComponent ? LevelComponent->GetDamageMultiplier() : 1.0f
+			);
+		}
 		}
 	}
 }
@@ -878,4 +986,9 @@ void ACYYCharacterFather::RestoreWeaponsFromSave(const TArray<E_Weapon>& Equippe
 			break;
 		}
 	}
+
+	int32 EquippedCount = 0;
+	for (const auto& Slot : WeaponSlots) { if (Slot.WeaponActor) ++EquippedCount; }
+	UE_LOG(LogTemp, Warning, TEXT("[RESTORE] 恢复完成 -> 装备槽:%d把 背包:%d把"),
+		EquippedCount, BackpackWeapons.Num());
 }

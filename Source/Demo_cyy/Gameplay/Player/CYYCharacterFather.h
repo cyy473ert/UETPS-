@@ -11,6 +11,7 @@ class UAnimInstance;
 class UHealthComponent;
 class UInventoryComponent;
 class ULevelProgressionComponent;
+class USoundBase;
 enum class EMedkitUseResult : uint8;
 
 USTRUCT(BlueprintType)
@@ -80,8 +81,17 @@ public:
 	float Speed = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Combat, meta=(AllowPrivateAccess="true"))
 	class USoundCue* FireSound;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Combat, meta=(AllowPrivateAccess="true", ClampMin="0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Combat", meta=(AllowPrivateAccess="true", ClampMin="0.0"))
 	float FireSoundMinInterval = 0.06f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound", meta = (AllowPrivateAccess = "true"))
+	USoundBase* HurtSound = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound", meta = (AllowPrivateAccess = "true"))
+	USoundBase* DeathSound = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sound", meta = (AllowPrivateAccess = "true"))
+	USoundBase* MedkitUseSound = nullptr;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category=Movement, meta=(AllowPrivateAccess="true"))
 	UAnimInstance* AnimInstance = nullptr;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Aim")
@@ -134,6 +144,7 @@ public:
 	void UpdateMoveSpeed();
 	void UpdateAmmoUI(float ReloadAlpha = 0.0f);
 	EMedkitUseResult TryUseMedkit();
+	static constexpr float MedkitHealAmount = 40.0f;
 	void ClearMedkitInventory();
 
 	// 从存档恢复武器
@@ -141,6 +152,9 @@ public:
 
 	UFUNCTION()
 	void OnLeveledUp(int32 NewLevel, int32 OldLevel);
+
+	UFUNCTION(Client, Reliable)
+	void ClientShowLevelUp(int32 NewLevel, int32 OldLevel);
 
 private:
 	// 武器类型 → 蓝图类映射（在 BP_CharacterFather 里配）

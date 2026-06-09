@@ -6,7 +6,7 @@ public class Demo_cyy : ModuleRules
 {
 	public Demo_cyy(ReadOnlyTargetRules Target) : base(Target)
 	{
-		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+		PCHUsage = PCHUsageMode.NoPCHs;
 		PrivateIncludePaths.AddRange(new string[] {
 			ModuleDirectory,
 			ModuleDirectory + "/Gameplay/Player",
@@ -20,6 +20,7 @@ public class Demo_cyy : ModuleRules
 			ModuleDirectory + "/Combat",
 			ModuleDirectory + "/AI/Enemy",
 			ModuleDirectory + "/Interaction",
+			ModuleDirectory + "/Gameplay/Pickups",
 			ModuleDirectory + "/Gameplay/Interactables"
 
 		});

@@ -71,3 +71,21 @@ void UAmmoWidget::SetActiveWeaponSlot(int32 SlotIndex)
 		}
 	}
 }
+
+void UAmmoWidget::SetLevelInfo(int32 Level, float CurrentHP, float MaxHP, float DamageMult)
+{
+	if (TB_Level)
+	{
+		TB_Level->SetText(FText::FromString(FString::Printf(TEXT("Lv.%d"), Level)));
+	}
+	if (TB_HPValue)
+	{
+		TB_HPValue->SetText(FText::FromString(
+			FString::Printf(TEXT("%.0f/%.0f"), CurrentHP, MaxHP)));
+	}
+	if (TB_DamageMult)
+	{
+		TB_DamageMult->SetText(FText::FromString(
+			FString::Printf(TEXT("%.1fx"), DamageMult)));
+	}
+}
